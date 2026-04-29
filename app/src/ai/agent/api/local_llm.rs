@@ -244,18 +244,17 @@ pub async fn generate_local_llm_output(
     };
     let _ = tx.send(Ok(init_event)).await;
 
-    let initial_task = api::Task {
-        id: t_id.clone(),
-        description: String::new(),
-        dependencies: None,
-        messages: vec![],
-        summary: String::new(),
-        server_data: String::new(),
-    };
     let create_task_action = api::ClientAction {
         action: Some(api::client_action::Action::CreateTask(
             api::client_action::CreateTask {
-                task: Some(initial_task),
+                task: Some(api::Task {
+                    id: t_id.clone(),
+                    description: String::new(),
+                    dependencies: None,
+                    messages: vec![],
+                    summary: String::new(),
+                    server_data: String::new(),
+                }),
             },
         )),
     };
