@@ -270,9 +270,11 @@ pub async fn generate_local_llm_output(
         .await;
 
     tokio::spawn(async move {
-        let mut accumulated_text = String::new();
+        let mut raw_text = String::new();
+        let mut visible_text = String::new();
         let message_id = Uuid::new_v4().to_string();
         let mut first_content = true;
+        let mut inside_think = false;
 
         use futures::StreamExt;
         let mut byte_stream = response.bytes_stream();
@@ -304,7 +306,33 @@ pub async fn generate_local_llm_output(
 
                         for choice in &chunk.choices {
                             if let Some(content) = &choice.delta.content {
-                                accumulated_text.push_str(content);
+                                raw_text.push_str(content);
+
+                                // Strip <think>...</think> blocks (qwen3, deepseek, etc.)
+                                if !inside_think {
+                                    if let Some(start) = content.find("<think>") {
+                                        visible_text.push_str(&content[..start]);
+                                        inside_think = true;
+                                    } else {
+                                        visible_text.push_str(content);
+                                    }
+                                }
+                                if inside_think {
+                                    if raw_text.contains("</think>") {
+                                        inside_think = false;
+                                        if let Some(end_pos) = raw_text.rfind("</think>") {
+                                            let after = &raw_text[end_pos + 8..];
+                                            visible_text.clear();
+                                            visible_text.push_str(after.trim_start());
+                                        }
+                                    } else {
+                                        continue;
+                                    }
+                                }
+
+                                if visible_text.is_empty() {
+                                    continue;
+                                }
 
                                 let message = api::Message {
                                     id: message_id.clone(),
@@ -315,7 +343,7 @@ pub async fn generate_local_llm_output(
                                     citations: vec![],
                                     message: Some(api::message::Message::AgentOutput(
                                         api::message::AgentOutput {
-                                            text: accumulated_text.clone(),
+                                            text: visible_text.clone(),
                                         },
                                     )),
                                 };
