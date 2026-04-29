@@ -383,13 +383,7 @@ impl View for AgentViewZeroStateBlock {
         let appearance = Appearance::as_ref(app);
         let theme = appearance.theme();
 
-        let header_props = if self.origin.is_cloud_agent() {
-            HeaderProps {
-                title: "New Oz cloud agent conversation".into(),
-                description: AgentViewDescription::CloudModeWithDocsLink,
-                icon: Icon::OzCloud,
-            }
-        } else {
+        let header_props = {
             let mut local_description =
                 "Send a prompt below to start a new conversation".to_owned();
             let active_session = self.active_session(app);
@@ -401,7 +395,7 @@ impl View for AgentViewZeroStateBlock {
             }
 
             HeaderProps {
-                title: "New Oz agent conversation".into(),
+                title: "New agent conversation".into(),
                 description: AgentViewDescription::PlainText(vec![local_description.into()]),
                 icon: Icon::Oz,
             }
@@ -729,7 +723,7 @@ fn render_body(props: ZeroStateBodyProps<'_>, app: &AppContext) -> Vec<Box<dyn E
                         MessageItem::keystroke(
                             ENTER_CLOUD_AGENT_VIEW_NEW_CONVERSATION_KEYSTROKE.clone(),
                         ),
-                        MessageItem::text("start a new cloud agent conversation"),
+                        MessageItem::text("start a new agent conversation"),
                     ],
                     |ctx| {
                         ctx.dispatch_typed_action(TerminalAction::EnterCloudAgentView);

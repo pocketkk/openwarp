@@ -19,7 +19,7 @@ pub static AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
 
 pub static CLOUD_AGENT: LazyLock<StaticCommand> = LazyLock::new(|| StaticCommand {
     name: "/cloud-agent",
-    description: "Start a new cloud agent conversation",
+    description: "Start a new agent conversation",
     icon_path: "bundled/svg/oz-cloud.svg",
     availability: Availability::AI_ENABLED,
     auto_enter_ai_mode: false,
