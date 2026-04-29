@@ -86,21 +86,20 @@ fn default_voice_requests_limit() -> usize {
 }
 
 impl Default for RequestLimitInfo {
-    /// This is the default rate limit for the free tier imposed by the server as of 02/10/25.
     fn default() -> Self {
         Self {
-            limit: 150,
+            limit: 999_999_999,
             num_requests_used_since_refresh: 0,
             next_refresh_time: ServerTimestamp::new(Utc::now() + chrono::Duration::days(30)),
-            is_unlimited: false,
+            is_unlimited: true,
             request_limit_refresh_duration: RequestLimitRefreshDuration::Monthly,
-            is_unlimited_voice: false,
+            is_unlimited_voice: true,
             voice_request_limit: default_voice_requests_limit(),
             voice_requests_used_since_last_refresh: 0,
-            is_unlimited_codebase_indices: false,
-            max_codebase_indices: 3,
-            max_files_per_repo: 5000,
-            embedding_generation_batch_size: 100,
+            is_unlimited_codebase_indices: true,
+            max_codebase_indices: 999,
+            max_files_per_repo: 999_999,
+            embedding_generation_batch_size: 500,
         }
     }
 }
@@ -519,71 +518,11 @@ impl AIRequestUsageModel {
             .sum()
     }
 
-    /// Computes the current banner state based on live conditions.
-    /// This is called on-demand and always returns fresh state.
     pub fn compute_buy_addon_credits_banner_display_state(
         &self,
-        ctx: &AppContext,
+        _ctx: &AppContext,
     ) -> BuyCreditsBannerDisplayState {
-        // Early return if user dismissed
-        if self.buy_addon_credits_banner_dismissed {
-            return BuyCreditsBannerDisplayState::Hidden;
-        }
-        let current_workspace = UserWorkspaces::as_ref(ctx).current_workspace();
-        let policy_allows_purchasing = current_workspace
-            .map(|w| {
-                w.billing_metadata
-                    .tier
-                    .purchase_add_on_credits_policy
-                    .is_some_and(|p| p.enabled)
-            })
-            .unwrap_or(false);
-
-        // TODO: we might want to suggest credits purchase if request_remain/bonus credits is below certain threshold
-        // something to consider after launch
-        // Ambient-only credits are usable for cloud agents and should not suppress this banner.
-        let now = Utc::now();
-        let has_non_ambient_bonus_credits = self
-            .bonus_grants
-            .iter()
-            .filter(|grant| grant.grant_type != BonusGrantType::AmbientOnly)
-            .filter(|grant| grant.expiration.is_none_or(|exp| now < exp))
-            .filter(|grant| grant.request_credits_remaining > 0)
-            .any(|grant| match grant.scope {
-                BonusGrantScope::User => true,
-                BonusGrantScope::Workspace(uid) => {
-                    current_workspace.is_some_and(|workspace| workspace.uid == uid)
-                }
-            });
-        if !policy_allows_purchasing
-            || self.has_requests_remaining()
-            || has_non_ambient_bonus_credits
-        {
-            return BuyCreditsBannerDisplayState::Hidden;
-        }
-
-        let auto_reload_enabled = current_workspace
-            .is_some_and(|w| w.settings.addon_credits_settings.auto_reload_enabled);
-        if !auto_reload_enabled {
-            return BuyCreditsBannerDisplayState::OutOfCredits;
-        }
-
-        let at_monthly_limit =
-            current_workspace.is_some_and(|w| w.is_at_addon_credits_monthly_limit());
-
-        let auto_reload_would_exceed = current_workspace
-            .and_then(|workspace| {
-                let options = PricingInfoModel::as_ref(ctx).addon_credits_options()?;
-                let price = workspace.get_auto_reload_price_cents(options)?;
-                Some(workspace.would_addon_purchase_reach_limit(price))
-            })
-            .unwrap_or(false);
-
-        if at_monthly_limit || auto_reload_would_exceed {
-            BuyCreditsBannerDisplayState::MonthlyLimitReached
-        } else {
-            BuyCreditsBannerDisplayState::Hidden
-        }
+        BuyCreditsBannerDisplayState::Hidden
     }
 
     pub fn dismiss_buy_credits_banner(&mut self, ctx: &mut ModelContext<Self>) {

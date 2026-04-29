@@ -9,7 +9,11 @@ use warpui::{Entity, ModelContext, SingletonEntity};
 
 use crate::{
     ai::agent::{
-        api::{self, generate_multi_agent_output, ConvertToAPITypeError},
+        api::{
+            self, generate_multi_agent_output,
+            local_llm::{generate_local_llm_output, LocalLLMConfig},
+            ConvertToAPITypeError,
+        },
         conversation::AIConversationId,
         AIIdentifiers, CancellationReason,
     },
@@ -85,14 +89,24 @@ impl ResponseStream {
         can_attempt_resume_on_error: bool,
         ctx: &mut ModelContext<Self>,
     ) -> Self {
-        let server_api = ServerApiProvider::as_ref(ctx).get();
         let (cancellation_tx, cancellation_rx) = oneshot::channel();
         let start_time = Local::now();
 
         let request_id = Uuid::new_v4();
         let params_clone = params.clone();
-        let _ =
-            ctx.spawn(
+        let local_config = LocalLLMConfig::load();
+        if local_config.enabled {
+            let _ = ctx.spawn(
+                async move {
+                    generate_local_llm_output(local_config, params_clone, cancellation_rx).await
+                },
+                move |me, stream, ctx| {
+                    me.handle_response_stream_result(request_id, stream, ctx);
+                },
+            );
+        } else {
+            let server_api = ServerApiProvider::as_ref(ctx).get();
+            let _ = ctx.spawn(
                 async move {
                     generate_multi_agent_output(server_api, params_clone, cancellation_rx).await
                 },
@@ -100,6 +114,7 @@ impl ResponseStream {
                     me.handle_response_stream_result(request_id, stream, ctx);
                 },
             );
+        }
         Self {
             id: ResponseStreamId(Uuid::new_v4().to_string()),
             params: params.clone(),
@@ -155,13 +170,27 @@ impl ResponseStream {
         let request_id = Uuid::new_v4();
         self.current_request_id = Some(request_id);
         let params = self.params.clone();
-        let server_api = ServerApiProvider::as_ref(ctx).get();
-        let _ = ctx.spawn(
-            async move { generate_multi_agent_output(server_api, params, cancellation_rx).await },
-            move |me, stream, ctx| {
-                me.handle_response_stream_result(request_id, stream, ctx);
-            },
-        );
+        let local_config = LocalLLMConfig::load();
+        if local_config.enabled {
+            let _ = ctx.spawn(
+                async move {
+                    generate_local_llm_output(local_config, params, cancellation_rx).await
+                },
+                move |me, stream, ctx| {
+                    me.handle_response_stream_result(request_id, stream, ctx);
+                },
+            );
+        } else {
+            let server_api = ServerApiProvider::as_ref(ctx).get();
+            let _ = ctx.spawn(
+                async move {
+                    generate_multi_agent_output(server_api, params, cancellation_rx).await
+                },
+                move |me, stream, ctx| {
+                    me.handle_response_stream_result(request_id, stream, ctx);
+                },
+            );
+        }
     }
 
     /// Cancels the stream. The conversation_id is preserved in the emitted event for async handling.

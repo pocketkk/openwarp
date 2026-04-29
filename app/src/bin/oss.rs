@@ -5,16 +5,27 @@
 use anyhow::Result;
 use warp_core::{
     channel::{Channel, ChannelConfig, ChannelState, OzConfig, WarpServerConfig},
+    features::FeatureFlag,
     AppId,
 };
 
-// Simple wrapper around warp::run() for Warp OSS builds.
+const DENIED_FLAGS: &[FeatureFlag] = &[
+    FeatureFlag::ForceLogin,
+    FeatureFlag::WithSandboxTelemetry,
+    FeatureFlag::CrashReporting,
+    FeatureFlag::CocoaSentry,
+    FeatureFlag::LogExpensiveFramesInSentry,
+    FeatureFlag::AgentModeAnalytics,
+    FeatureFlag::RecordAppActiveEvents,
+    FeatureFlag::RecordPtyThroughput,
+];
+
 fn main() -> Result<()> {
     let mut state = ChannelState::new(
         Channel::Oss,
         ChannelConfig {
-            app_id: AppId::new("dev", "warp", "WarpOss"),
-            logfile_name: "warp-oss.log".into(),
+            app_id: AppId::new("dev", "openwarp", "OpenWarp"),
+            logfile_name: "openwarp.log".into(),
             server_config: WarpServerConfig::production(),
             oz_config: OzConfig::production(),
             telemetry_config: None,
@@ -23,9 +34,18 @@ fn main() -> Result<()> {
             mcp_static_config: None,
         },
     );
-    if cfg!(debug_assertions) {
-        state = state.with_additional_features(warp_core::features::DEBUG_FLAGS);
-    }
+
+    // Enable all feature flag groups so nothing is gated behind subscriptions.
+    let all_flags: Vec<FeatureFlag> = warp_core::features::DEBUG_FLAGS
+        .iter()
+        .chain(warp_core::features::DOGFOOD_FLAGS)
+        .chain(warp_core::features::PREVIEW_FLAGS)
+        .chain(warp_core::features::RELEASE_FLAGS)
+        .copied()
+        .filter(|f| !DENIED_FLAGS.contains(f))
+        .collect();
+    state = state.with_additional_features(&all_flags);
+
     ChannelState::set(state);
 
     warp::run()
@@ -41,15 +61,15 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>CFBundleDevelopmentRegion</key>
     <string>English</string>
     <key>CFBundleDisplayName</key>
-    <string>WarpOss</string>
+    <string>OpenWarp</string>
     <key>CFBundleExecutable</key>
-    <string>warp-oss</string>
+    <string>openwarp</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.warp.WarpOss</string>
+    <string>dev.openwarp.OpenWarp</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>WarpOss</string>
+    <string>OpenWarp</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
@@ -61,9 +81,9 @@ embed_plist::embed_info_plist_bytes!(r#"
     <key>UIDesignRequiresCompatibility</key>
     <true/>
     <key>CFBundleURLTypes</key>
-    <array><dict><key>CFBundleURLName</key><string>Custom App</string><key>CFBundleURLSchemes</key><array><string>warposs</string></array></dict></array>
+    <array><dict><key>CFBundleURLName</key><string>OpenWarp</string><key>CFBundleURLSchemes</key><array><string>openwarp</string></array></dict></array>
     <key>NSHumanReadableCopyright</key>
-    <string>© 2026, Denver Technologies, Inc</string>
+    <string>© 2026 OpenWarp Contributors</string>
     </dict>
     </plist>
 "#.as_bytes());

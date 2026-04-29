@@ -347,44 +347,6 @@ impl AccountWidget {
             })
             .finish();
 
-        let mut plan_info = Flex::column()
-            .with_main_axis_alignment(MainAxisAlignment::SpaceEvenly)
-            .with_cross_axis_alignment(CrossAxisAlignment::End);
-        let current_user_id = auth_state.user_id().unwrap_or_default();
-
-        plan_info.add_child(render_customer_type_badge(appearance, "Free".into()));
-        plan_info.add_child(
-            Container::new(
-                appearance
-                    .ui_builder()
-                    .button(
-                        ButtonVariant::Link,
-                        self.ui_state_handles.upgrade_link.clone(),
-                    )
-                    .with_text_and_icon_label(
-                        TextAndIcon::new(
-                            TextAndIconAlignment::IconFirst,
-                            "Compare plans",
-                            Icon::CoinsStacked.to_warpui_icon(appearance.theme().accent()),
-                            MainAxisSize::Min,
-                            MainAxisAlignment::Center,
-                            vec2f(14., 14.),
-                        )
-                        .with_inner_padding(4.),
-                    )
-                    .build()
-                    .on_click(move |ctx, _, _| {
-                        ctx.dispatch_typed_action(MainPageAction::Upgrade {
-                            team_uid: None,
-                            user_id: current_user_id,
-                        });
-                    })
-                    .finish(),
-            )
-            .with_margin_top(8.)
-            .finish(),
-        );
-
         Flex::row()
             .with_child(
                 Shrinkable::new(
@@ -397,7 +359,6 @@ impl AccountWidget {
                 )
                 .finish(),
             )
-            .with_child(Align::new(plan_info.finish()).right().finish())
             .with_cross_axis_alignment(CrossAxisAlignment::Start)
             .finish()
     }
@@ -479,128 +440,12 @@ impl AccountWidget {
             user_info.add_child(display_name);
         }
 
-        let mut plan_info = Flex::column()
-            .with_main_axis_alignment(MainAxisAlignment::SpaceEvenly)
-            .with_cross_axis_alignment(CrossAxisAlignment::End);
-        let current_user_id = auth_state.user_id().unwrap_or_default();
-        let workspaces = UserWorkspaces::as_ref(app);
-        if let Some(team) = workspaces.current_team() {
-            if team.billing_metadata.customer_type != CustomerType::Unknown {
-                plan_info.add_child(render_customer_type_badge(
-                    appearance,
-                    team.billing_metadata.customer_type.to_display_string(),
-                ));
-            }
-
-            let current_user_email = auth_state.user_email().unwrap_or_default();
-            let has_admin_permissions = team.has_admin_permissions(&current_user_email);
-            if has_admin_permissions {
-                if team.billing_metadata.customer_type == CustomerType::Enterprise {
-                    plan_info.add_child(
-                        appearance
-                            .ui_builder()
-                            .link(
-                                "Contact support".into(),
-                                Some("mailto:support@warp.dev".into()),
-                                None,
-                                self.ui_state_handles.enterprise_contact_us_link.clone(),
-                            )
-                            .soft_wrap(false)
-                            .build()
-                            .with_margin_top(8.)
-                            .finish(),
-                    );
-                } else {
-                    if team.has_billing_history {
-                        let team_uid = team.uid;
-                        plan_info.add_child(
-                            appearance
-                                .ui_builder()
-                                .link(
-                                    "Manage billing".into(),
-                                    None,
-                                    Some(Box::new(move |ctx| {
-                                        ctx.dispatch_typed_action(
-                                            MainPageAction::GenerateStripeBillingPortalLink {
-                                                team_uid,
-                                            },
-                                        );
-                                    })),
-                                    self.ui_state_handles.stripe_billing_portal_link.clone(),
-                                )
-                                .soft_wrap(false)
-                                .build()
-                                .with_margin_top(8.)
-                                .finish(),
-                        );
-                    }
-
-                    // If the team is upgradeable to self-serve tier, show them the upgrade link.
-                    if team.billing_metadata.can_upgrade_to_higher_tier_plan() {
-                        let description = match team.billing_metadata.customer_type {
-                            CustomerType::Prosumer => "Upgrade to Turbo plan",
-                            CustomerType::Turbo => "Upgrade to Lightspeed plan",
-                            _ => "Compare plans",
-                        };
-                        let team_uid = team.uid;
-                        plan_info.add_child(
-                            appearance
-                                .ui_builder()
-                                .link(
-                                    description.into(),
-                                    None,
-                                    Some(Box::new(move |ctx| {
-                                        ctx.dispatch_typed_action(MainPageAction::Upgrade {
-                                            team_uid: Some(team_uid),
-                                            user_id: current_user_id,
-                                        });
-                                    })),
-                                    self.ui_state_handles.upgrade_link.clone(),
-                                )
-                                .soft_wrap(false)
-                                .build()
-                                .with_margin_top(8.)
-                                .finish(),
-                        );
-                    }
-                }
-            }
-        } else {
-            let plan_badge_child = render_customer_type_badge(appearance, "Free".into());
-            plan_info.add_child(plan_badge_child);
-
-            plan_info.add_child(
-                appearance
-                    .ui_builder()
-                    .link(
-                        "Compare plans".into(),
-                        None,
-                        Some(Box::new(move |ctx| {
-                            ctx.dispatch_typed_action(MainPageAction::Upgrade {
-                                team_uid: None,
-                                user_id: current_user_id,
-                            });
-                        })),
-                        self.ui_state_handles.upgrade_link.clone(),
-                    )
-                    .soft_wrap(false)
-                    .build()
-                    .with_margin_top(8.)
-                    .finish(),
-            );
-        }
-
-        let mut row = Flex::row()
+        Flex::row()
             .with_child(
                 Shrinkable::new(1.0, Align::new(user_info.finish()).left().finish()).finish(),
             )
-            .with_cross_axis_alignment(CrossAxisAlignment::Start);
-
-        if !FeatureFlag::UsageBasedPricing.is_enabled() {
-            row.add_child(Align::new(plan_info.finish()).right().finish());
-        }
-
-        row.finish()
+            .with_cross_axis_alignment(CrossAxisAlignment::Start)
+            .finish()
     }
 }
 
@@ -865,7 +710,7 @@ impl VersionInfoWidget {
                             color: ansi_red,
                         }),
                         Some(CallToActionContent {
-                            text: "Relaunch Warp",
+                            text: "Relaunch OpenWarp",
                             action: MainPageAction::Relaunch,
                         }),
                     ),
@@ -882,28 +727,28 @@ impl VersionInfoWidget {
                             color: faded_text_color,
                         }),
                         Some(CallToActionContent {
-                            text: "Relaunch Warp",
+                            text: "Relaunch OpenWarp",
                             action: MainPageAction::Relaunch,
                         }),
                     ),
                     AutoupdateStage::UnableToUpdateToNewVersion { .. } => (
                         Some(StatusContent {
-                            text: "A new version of Warp is available but can't be installed",
+                            text: "A new version of OpenWarp is available but can't be installed",
                             color: ansi_red,
                         }),
                         Some(CallToActionContent {
-                            text: "Update Warp manually",
+                            text: "Update OpenWarp manually",
                             // note: the handler for this action is a no-op
                             action: MainPageAction::DownloadUpdate,
                         }),
                     ),
                     AutoupdateStage::UnableToLaunchNewVersion { .. } => (
                         Some(StatusContent {
-                            text: "A new version of Warp is installed but can't be launched.",
+                            text: "A new version of OpenWarp is installed but can't be launched.",
                             color: ansi_red,
                         }),
                         Some(CallToActionContent {
-                            text: "Update Warp manually",
+                            text: "Update OpenWarp manually",
                             // note: the handler for this action is a no-op
                             action: MainPageAction::DownloadUpdate,
                         }),
