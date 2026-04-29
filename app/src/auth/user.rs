@@ -171,7 +171,7 @@ impl User {
             local_id: UserUid::new(TEST_USER_UID),
             metadata: UserMetadata {
                 email: TEST_USER_EMAIL.to_string(),
-                display_name: None,
+                display_name: Some("Local User".to_string()),
                 photo_url: None,
             },
             is_onboarded: true,
