@@ -2502,7 +2502,10 @@ impl AIConversation {
                 message: Some(message),
                 mask: Some(mask),
             }) => {
-                let task_id = TaskId::new(task_id);
+                let mut task_id = TaskId::new(task_id);
+                if self.task_store.get(&task_id).is_none() {
+                    task_id = self.task_store.root_task_id().clone();
+                }
                 let exchange_id = self
                     .added_exchanges_by_response
                     .get(response_stream_id)

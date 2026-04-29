@@ -271,6 +271,7 @@ pub async fn generate_local_llm_output(
     tokio::spawn(async move {
         let mut raw_text = String::new();
         let mut visible_text = String::new();
+        let mut last_sent_len: usize = 0;
         let message_id = Uuid::new_v4().to_string();
         let mut first_content = true;
         let mut inside_think = false;
@@ -333,22 +334,22 @@ pub async fn generate_local_llm_output(
                                     continue;
                                 }
 
-                                let message = api::Message {
-                                    id: message_id.clone(),
-                                    task_id: t_id.clone(),
-                                    request_id: req_id.clone(),
-                                    timestamp: None,
-                                    server_message_data: String::new(),
-                                    citations: vec![],
-                                    message: Some(api::message::Message::AgentOutput(
-                                        api::message::AgentOutput {
-                                            text: visible_text.clone(),
-                                        },
-                                    )),
-                                };
-
                                 let action = if first_content {
                                     first_content = false;
+                                    last_sent_len = visible_text.len();
+                                    let message = api::Message {
+                                        id: message_id.clone(),
+                                        task_id: t_id.clone(),
+                                        request_id: req_id.clone(),
+                                        timestamp: None,
+                                        server_message_data: String::new(),
+                                        citations: vec![],
+                                        message: Some(api::message::Message::AgentOutput(
+                                            api::message::AgentOutput {
+                                                text: visible_text.clone(),
+                                            },
+                                        )),
+                                    };
                                     api::client_action::Action::AddMessagesToTask(
                                         api::client_action::AddMessagesToTask {
                                             task_id: t_id.clone(),
@@ -356,11 +357,29 @@ pub async fn generate_local_llm_output(
                                         },
                                     )
                                 } else {
-                                    api::client_action::Action::UpdateTaskMessage(
-                                        api::client_action::UpdateTaskMessage {
+                                    let delta = visible_text[last_sent_len..].to_string();
+                                    last_sent_len = visible_text.len();
+                                    let message = api::Message {
+                                        id: message_id.clone(),
+                                        task_id: t_id.clone(),
+                                        request_id: req_id.clone(),
+                                        timestamp: None,
+                                        server_message_data: String::new(),
+                                        citations: vec![],
+                                        message: Some(api::message::Message::AgentOutput(
+                                            api::message::AgentOutput {
+                                                text: delta,
+                                            },
+                                        )),
+                                    };
+                                    let mask = prost_types::FieldMask {
+                                        paths: vec!["agent_output.text".to_string()],
+                                    };
+                                    api::client_action::Action::AppendToMessageContent(
+                                        api::client_action::AppendToMessageContent {
                                             task_id: t_id.clone(),
                                             message: Some(message),
-                                            mask: None,
+                                            mask: Some(mask),
                                         },
                                     )
                                 };
