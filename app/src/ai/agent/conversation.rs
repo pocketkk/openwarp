@@ -2344,7 +2344,12 @@ impl AIConversation {
                     }
                 }
 
-                let task_id = TaskId::new(task_id);
+                let mut task_id = TaskId::new(task_id);
+                // Fall back to the root task if the requested task ID isn't found.
+                // This handles local LLM backends that generate their own task IDs.
+                if self.task_store.get(&task_id).is_none() {
+                    task_id = self.task_store.root_task_id().clone();
+                }
                 self.checkpoint_task(&task_id);
                 let current_todo_list = self.todo_lists.last().cloned();
 
@@ -2444,7 +2449,10 @@ impl AIConversation {
                 message: Some(message),
                 mask: Some(mask),
             }) => {
-                let task_id = TaskId::new(task_id);
+                let mut task_id = TaskId::new(task_id);
+                if self.task_store.get(&task_id).is_none() {
+                    task_id = self.task_store.root_task_id().clone();
+                }
                 let exchange_id = self
                     .added_exchanges_by_response
                     .get(response_stream_id)
