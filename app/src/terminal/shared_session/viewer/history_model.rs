@@ -1,7 +1,9 @@
+//! Stub — shared session viewer history model removed from OpenWarp.
+#![allow(dead_code)]
+
 use crate::terminal::HistoryEntry;
 use warpui::Entity;
 
-/// Responsible for managing the history of a shared session for a viewer.
 #[derive(Default)]
 pub struct SharedSessionHistoryModel {
     entries: Vec<HistoryEntry>,

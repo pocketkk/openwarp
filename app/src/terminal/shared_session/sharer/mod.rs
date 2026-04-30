@@ -1,2 +1,2 @@
-//! The sharer is the client that initiates the shared session.
+//! Stub — shared session sharer removed from OpenWarp.
 pub(crate) mod network;
