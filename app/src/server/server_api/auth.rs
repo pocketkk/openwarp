@@ -3,7 +3,44 @@ use std::{result::Result as StdResult, sync::Arc};
 use anyhow::{anyhow, bail, Context as _, Result};
 use async_trait::async_trait;
 use cynic::{MutationBuilder, QueryBuilder};
-use firebase::{FetchAccessTokenResponse, FirebaseError};
+// Inlined from the removed `firebase` crate.
+use serde::{Deserialize, Serialize};
+
+/// Format for error response payloads for Google APIs (firebase).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FirebaseError {
+    pub code: i32,
+    pub message: String,
+}
+
+impl std::error::Error for FirebaseError {}
+
+impl std::fmt::Display for FirebaseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Firebase request failed with status {} and message: {}",
+            self.code, self.message
+        )
+    }
+}
+
+/// The possible response values from fetching an access token from a refresh token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum FetchAccessTokenResponse {
+    Success {
+        #[serde(alias = "expiresIn")]
+        expires_in: String,
+        #[serde(alias = "idToken")]
+        id_token: String,
+        #[serde(alias = "refreshToken")]
+        refresh_token: String,
+    },
+    Error {
+        error: FirebaseError,
+    },
+}
 use futures::FutureExt;
 use instant::Duration;
 #[cfg(test)]
